@@ -8,22 +8,25 @@ export enum Direction {
     WEST = 3
 }
 
+export interface SaveData {
+    data: any;
+    nameIdData: any;
+    excludedCoordinates: any;
+}
+
 export enum Language {
     FRENCH = 'fr',
-    ENGLISH = 'en'
-    // todo: add other languages
+    ENGLISH = 'en',
+    DEUTSCH = 'de',
+    SPANISH = 'es',
+    PORTUGUESE = 'pt',
+    ITALIAN = 'it'
 }
 
 export interface Coordinates {
     x: number;
     y: number;
 }
-
-export type ModalContent = {
-    [key: string]: {
-        [key in Language]: string;
-    };
-};
 
 export interface DomElements {
     x: ElementHandle;

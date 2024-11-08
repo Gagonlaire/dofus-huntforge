@@ -8,10 +8,10 @@ export enum Direction {
     WEST = 3
 }
 
-export interface SaveData {
+export interface Data {
     data: any;
     nameIdData: any;
-    excludedCoordinates: any;
+    excludedCoordinates: Set<string>;
 }
 
 export enum Language {

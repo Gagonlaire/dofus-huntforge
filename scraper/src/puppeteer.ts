@@ -1,10 +1,11 @@
 import {ElementHandle, Page, PuppeteerLaunchOptions} from "puppeteer";
-import {type Context, Direction, DomElements, Language} from "../../types";
-import {selectors} from "../data";
-import logger from "../logger";
+import {type Context, Direction, DomElements, Language} from "../types";
+import {selectors} from "./data";
+import logger from "./logger";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import {GhostCursor} from "ghost-cursor";
+import chalk from "chalk";
 
 export const getDomElements = async (page: Page): Promise<DomElements> => {
     const [fields, directions] = await Promise.all([
@@ -63,7 +64,7 @@ export const connect = async (options: PuppeteerLaunchOptions) => {
 
     logger.info('Setting human-like user agent')
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36')
-    logger.info('Connecting to https://dofusdb.fr/fr/tools/treasure-hunt')
+    logger.info(`Connecting to ${chalk.bold('https://dofusdb.fr/fr/tools/treasure-hunt')}`)
     await page.goto('https://dofusdb.fr/fr/tools/treasure-hunt')
     logger.info('Browser connected')
     logger.info('Injecting custom css')

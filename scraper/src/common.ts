@@ -1,12 +1,13 @@
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
-import {type Context, type Coordinates, type SaveData, Direction} from "../../types";
+import {type Context, type Coordinates, type Data, Direction} from "../types";
 import {Browser, Page} from "puppeteer";
 import {createCursor} from "ghost-cursor";
 import {getDomElements, getLanguage} from "./puppeteer";
-import logger from "../logger";
-import {defaultSavePath, saveFiles} from "../data";
+import logger from "./logger";
+import {defaultSavePath, saveFiles} from "./data";
+import chalk from "chalk";
 
 const handleFileError = (error: Error, operation: string) => {
     logger.error(`Error ${operation}: ${error.message}`);
@@ -35,6 +36,9 @@ export const parseCoordinatesFromUrl = (url: string): [Coordinates, Direction] =
     ];
 }
 
+export const formatCoordinates = (coordinates: Coordinates): string => {
+    return chalk.bold(`(${coordinates.x},${coordinates.y})`)
+}
 
 export const buildContext = async (browser: Browser, page: Page): Promise<Context> => {
     const cursor = createCursor(page)
@@ -59,9 +63,15 @@ export const buildKeyFromCoordinates = (coordinates: Coordinates): string => {
     return `${coordinates.x},${coordinates.y}`;
 }
 
+export const shouldScrapeCoordinate = (coordinates: Coordinates, data: Data): boolean => {
+    const key = buildKeyFromCoordinates(coordinates)
+
+    return !(data.excludedCoordinates.has(key) || (data.data[key] && !data.data[key].every((val: any) => val === null)));
+}
+
 export const saveToFolderSync = (
     folderPath = defaultSavePath,
-    {data, nameIdData, excludedCoordinates}: SaveData
+    {data, nameIdData, excludedCoordinates}: Data
 ) => {
     const paths = getFilePaths(folderPath);
 
@@ -69,6 +79,8 @@ export const saveToFolderSync = (
         logger.info(`Saving to folder: ${folderPath}`);
         fsSync.mkdirSync(folderPath, {recursive: true});
 
+        // todo: also save retryQueue
+        // todo: if file already exists, either merge or ask user if they want to overwrite
         fsSync.writeFileSync(paths.data, JSON.stringify(data));
         fsSync.writeFileSync(paths.nameIdData, JSON.stringify(nameIdData));
         fsSync.writeFileSync(
@@ -82,7 +94,7 @@ export const saveToFolderSync = (
 
 export const loadSaveFolder = async (
     folderPath: string = defaultSavePath
-): Promise<SaveData> => {
+): Promise<Data> => {
     const paths = getFilePaths(folderPath);
 
     try {
@@ -102,6 +114,6 @@ export const loadSaveFolder = async (
         };
     } catch (error) {
         handleFileError(error as Error, 'loading save folder');
-        return {} as SaveData;
+        return {} as Data;
     }
 };

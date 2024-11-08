@@ -1,4 +1,6 @@
 import winston from "winston";
+import {Coordinates} from "../types";
+import chalk from "chalk";
 
 const logger = winston.createLogger({
     level: 'info',

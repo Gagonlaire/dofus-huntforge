@@ -1,4 +1,4 @@
-<h1 align="center">DofusDB (Treasure Hunt) scrapper</h1>
+<h1 align="center">DofusDB (Treasure Hunt) scraper</h1>
 
 This script uses Puppeteer to scrape DofusDB's treasure hunt data. Additional installation may be required (check Puppeteer requirements).
 

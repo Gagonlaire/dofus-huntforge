@@ -1,18 +1,17 @@
 require('dotenv').config()
-import logger from "./src/logger";
-import {mapCoordinatesBounds} from "./src/data";
+import chalk from "chalk";
 import {HTTPResponse} from 'puppeteer'
+import {mapCoordinatesBounds} from "./src/data";
+import logger from "./src/logger";
+import {Context, Coordinates, Direction} from "./types";
 import {
-    buildContext, buildKeyFromCoordinates,
-    clickDirection,
-    connect,
+    buildContext,
+    buildKeyFromCoordinates, formatCoordinates,
     loadSaveFolder,
     parseCoordinatesFromUrl,
-    randomSleep,
-    saveToFolderSync,
-    updateInputValue
-} from "./src/utils"
-import {Context, Coordinates, Direction} from "./types";
+    randomSleep, saveToFolderSync, shouldScrapeCoordinate
+} from "./src/common";
+import {clickDirection, updateInputValue, connect} from "./src/puppeteer";
 
 let excludedCoordinates = new Set<string>()
 let data: any = {}
@@ -47,7 +46,8 @@ const handleNetworkResponse = async (ctx: Context, response: HTTPResponse) => {
 
     if (!response.ok()) {
         if (response.status() === 503) {
-            logger.warn(`Request blocked by reCAPTCHA (${coordinates.x},${coordinates.y} -> ${Direction[direction]}), adding to retry queue`)
+            // todo: when a position has some blocked requests, the data always result in a nullish array
+            logger.warn(`Request blocked by reCAPTCHA for ${formatCoordinates(coordinates)} -> ${chalk.bold(Direction[direction])}, adding to retry queue`)
             ctx.retryQueue.push({coordinates, direction})
             return
         }
@@ -101,7 +101,8 @@ const handleNetworkResponse = async (ctx: Context, response: HTTPResponse) => {
         }
 
         delete fetchedBuffer[key]
-        logger.info(`Fetched all hints for ${key} (${hintCount} hints)`)
+        // todo: fix the calculation of the hint count -> direction has a number of hints, not the total
+        logger.info(`Fetched ${chalk.bold(hintCount)} hints for ${formatCoordinates(coordinates)}`)
 
         if (hintCount === 0) {
             delete data[key]
@@ -123,7 +124,7 @@ const handleNetworkResponse = async (ctx: Context, response: HTTPResponse) => {
 
         data = loadedData
         nameIdData = loadedNameIdData
-        excludedCoordinates = excludedCoordinatesData
+        excludedCoordinates = new Set(excludedCoordinatesData)
     }
 
     const manual = process.env.MANUAL === 'true'
@@ -149,15 +150,37 @@ const handleNetworkResponse = async (ctx: Context, response: HTTPResponse) => {
     await page.waitForNetworkIdle()
 
     if (!manual) {
+        let skipCount = 0;
+        let skipStart: Coordinates;
+        let skipEnd: Coordinates;
+
         for (let y = mapCoordinatesBounds.minY; y <= mapCoordinatesBounds.maxY; y++) {
             for (let x = mapCoordinatesBounds.minX; x <= mapCoordinatesBounds.maxX; x++) {
-                const key = buildKeyFromCoordinates({x, y})
+                const coordinates: Coordinates = {x, y}
 
-                if (excludedCoordinates.has(key)) {
-                    logger.info(`Skipping excluded coordinates: ${key}`)
-                    continue
+                if (shouldScrapeCoordinate(coordinates, {data, nameIdData, excludedCoordinates})) {
+                    if (skipCount !== 0) {
+                        logger.info(`Skipping ${chalk.bold(skipCount)} positions from ${formatCoordinates(skipStart!)} to ${formatCoordinates(skipEnd!)}`)
+                        skipCount = 0
+                    }
+
+                    await getHintsForPosition(context, coordinates)
+                } else {
+                    if (skipCount === 0) {
+                        skipStart = coordinates;
+                    }
+                    skipEnd = coordinates;
+                    skipCount++;
                 }
-                await getHintsForPosition(context, {x, y})
+            }
+        }
+
+        // todo: swipe to a single queue to enable parallel fetching
+        while (context.retryQueue.length > 0) {
+            const last = context.retryQueue.shift()
+
+            if (last) {
+                await getHintsForPosition(context, last.coordinates, last.direction)
             }
         }
 

@@ -1,8 +1,8 @@
 export const mapCoordinatesBounds = {
-    minX: -100,
-    minY: -100,
-    maxX: 60,
-    maxY: 60,
+    minX: -88,
+    minY: -70,
+    maxX: 36,
+    maxY: 48,
 }
 
 export const defaultSavePath = './dist';

@@ -1,10 +1,10 @@
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
-import {type Context, type Coordinates, type Data, Direction} from "../types";
+import {type Context, Context2, type Coordinates, type Data, Direction} from "../../types";
 import {Browser, Page} from "puppeteer";
 import {createCursor} from "ghost-cursor";
-import {getDomElements, getLanguage} from "./puppeteer";
+import {getDomElements} from "../core";
 import logger from "./logger";
 import {defaultSavePath, saveFiles} from "./data";
 import chalk from "chalk";
@@ -40,19 +40,6 @@ export const formatCoordinates = (coordinates: Coordinates): string => {
     return chalk.bold(`(${coordinates.x},${coordinates.y})`)
 }
 
-export const buildContext = async (browser: Browser, page: Page): Promise<Context> => {
-    const cursor = createCursor(page)
-
-    return {
-        browser,
-        page,
-        cursor,
-        retryQueue: [],
-        elements: await getDomElements(page),
-        language: await getLanguage(page),
-    }
-}
-
 export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 export const randomSleep = async (min: number = 300, max: number = 700) => {
@@ -67,6 +54,14 @@ export const shouldScrapeCoordinate = (coordinates: Coordinates, data: Data): bo
     const key = buildKeyFromCoordinates(coordinates)
 
     return !(data.excludedCoordinates.has(key) || (data.data[key] && !data.data[key].every((val: any) => val === null)));
+}
+
+const handleExit = (context: Context2, reason: string) => {
+    logger.warn(`${reason}, saving state and exiting...`);
+
+    // todo: update this function
+    //saveToFolderSync(process.env.OUTPUT_PATH, {data, nameIdData, excludedCoordinates})
+    process.exit(0)
 }
 
 export const saveToFolderSync = (

@@ -1,5 +1,6 @@
 import type {ElementHandle, Page, Browser} from 'puppeteer'
 import type {GhostCursor} from "ghost-cursor";
+import {Logger} from "winston";
 
 export enum Direction {
     NORTH = 0,
@@ -12,15 +13,6 @@ export interface Data {
     data: any;
     nameIdData: any;
     excludedCoordinates: Set<string>;
-}
-
-export enum Language {
-    FRENCH = 'fr',
-    ENGLISH = 'en',
-    DEUTSCH = 'de',
-    SPANISH = 'es',
-    PORTUGUESE = 'pt',
-    ITALIAN = 'it'
 }
 
 export interface Coordinates {
@@ -43,5 +35,26 @@ export interface Context {
     elements: DomElements;
     lastCoordinates?: Coordinates;
     retryQueue: {coordinates: Coordinates, direction: Direction}[];
-    language: Language;
+}
+
+export interface Context2 {
+    buffer: any;
+    browser: Browser;
+    pages: PageInstance[];
+    data: any;
+    nameData: any;
+    excludedCoordinates: Set<string>;
+}
+
+export interface PageInstance {
+    page: Page;
+    cursor: GhostCursor;
+    logger: Logger;
+    // instance can pause itself after too many reCAPTCHA
+    paused: boolean;
+    // to know if input need to be updated
+    lastCoordinates?: Coordinates;
+    // if an instance fail to setup, it will be disabled
+    active: boolean;
+    elements: DomElements;
 }

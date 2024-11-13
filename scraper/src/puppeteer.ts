@@ -1,6 +1,6 @@
 import {ElementHandle, Page, PuppeteerLaunchOptions} from "puppeteer";
 import {type Context, Direction, DomElements, Language} from "../types";
-import {selectors} from "./data";
+import {selectors, userAgents} from "./data";
 import logger from "./logger";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
@@ -61,9 +61,10 @@ export const connect = async (options: PuppeteerLaunchOptions) => {
         .use(StealthPlugin())
         .launch(options)
     const page = await browser.newPage()
+    const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)]
 
-    logger.info('Setting human-like user agent')
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36')
+    logger.info('userAgent: ' + userAgent)
+    await page.setUserAgent(userAgent)
     logger.info(`Connecting to ${chalk.bold('https://dofusdb.fr/fr/tools/treasure-hunt')}`)
     await page.goto('https://dofusdb.fr/fr/tools/treasure-hunt')
     logger.info('Browser connected')
@@ -84,16 +85,4 @@ export const connect = async (options: PuppeteerLaunchOptions) => {
 export const clickDirection = async (ctx: Context, direction: Direction) => {
     await ctx.cursor.click(ctx.elements.directions[direction])
     await ctx.page.waitForNetworkIdle()
-
-    // modal detection
-    /*const [content, validateButton] = await Promise.all([
-        ctx.page.$(selectors.modalContent),
-        ctx.page.$(selectors.modalValidateButton)
-    ])
-    if (content && validateButton) {
-        const text = (await content.evaluate(node => node.textContent))!.trim()
-        await ctx.cursor.click(validateButton)
-    } else {
-        logger.error('Error while getting modal content, site may have changed')
-    }*/
 }

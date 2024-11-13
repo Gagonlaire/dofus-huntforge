@@ -19,6 +19,13 @@ let nameIdData: any = {}
 // buffer which position/direction has been fetched
 let fetchedBuffer: any = {}
 
+const handleExit = (reason: string) => {
+    logger.warn(`${reason}, saving state and exiting...`);
+
+    saveToFolderSync(process.env.OUTPUT_PATH, {data, nameIdData, excludedCoordinates})
+    process.exit(0)
+}
+
 const getHintsForPosition = async (ctx: Context, {x, y}: Coordinates, direction?: Direction) => {
     if (!ctx.lastCoordinates || ctx.lastCoordinates.x !== x) {
         await updateInputValue(ctx.elements.x, x.toString(), ctx.cursor)
@@ -141,11 +148,7 @@ const handleNetworkResponse = async (ctx: Context, response: HTTPResponse) => {
             handleNetworkResponse(context, response)
         }
     })
-    page.on('close', async () => {
-        logger.warn('Browser closed, saving state and exiting...')
-        saveToFolderSync(process.env.OUTPUT_PATH, {data, nameIdData, excludedCoordinates})
-        process.exit(0)
-    })
+    page.on('close', () => handleExit('Browser closed'))
 
     await page.waitForNetworkIdle()
 
@@ -164,7 +167,12 @@ const handleNetworkResponse = async (ctx: Context, response: HTTPResponse) => {
                         skipCount = 0
                     }
 
-                    await getHintsForPosition(context, coordinates)
+                    try {
+                        await getHintsForPosition(context, coordinates)
+                    } catch (e: any) {
+                        logger.error(e.message)
+                        handleExit('Error occurred')
+                    }
                 } else {
                     if (skipCount === 0) {
                         skipStart = coordinates;
@@ -175,25 +183,9 @@ const handleNetworkResponse = async (ctx: Context, response: HTTPResponse) => {
             }
         }
 
-        // todo: swipe to a single queue to enable parallel fetching
-        while (context.retryQueue.length > 0) {
-            const last = context.retryQueue.shift()
-
-            if (last) {
-                await getHintsForPosition(context, last.coordinates, last.direction)
-            }
-        }
-
         await browser.close()
     }
 })()
-
-const handleExit = async (signal: string) => {
-    logger.warn(`Received ${signal}, saving state and exiting...`);
-
-    saveToFolderSync(process.env.OUTPUT_PATH, {data, nameIdData, excludedCoordinates})
-    process.exit(0)
-}
 
 process.on('SIGINT', handleExit)
 process.on('SIGTERM', handleExit)

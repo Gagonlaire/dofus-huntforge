@@ -6,11 +6,6 @@ import logger from "./logger";
 import {defaultSavePath, saveFiles} from "./data";
 import chalk from "chalk";
 
-const handleFileError = (error: Error, operation: string) => {
-    logger.error(`Error ${operation}: ${error.message}`);
-    process.exit(1);
-};
-
 const getFilePaths = (folderPath: string) =>
     Object.entries(saveFiles).reduce((acc, [key, fileName]) => ({
         ...acc,
@@ -27,8 +22,7 @@ export const saveToFolderSync = (
         logger.info(`Saving to folder: ${folderPath}`);
         fsSync.mkdirSync(folderPath, {recursive: true});
 
-        // todo: also save retryQueue
-        // todo: if file already exists, either merge or ask user if they want to overwrite
+        // todo: if file already exists, either merge or ask user if they want to overwrite, maybe check at satrtup
         fsSync.writeFileSync(paths.data, JSON.stringify(data));
         fsSync.writeFileSync(paths.nameIdData, JSON.stringify(nameData));
         fsSync.writeFileSync(
@@ -36,17 +30,17 @@ export const saveToFolderSync = (
             JSON.stringify(Array.from(excludedCoordinates))
         );
     } catch (error) {
-        handleFileError(error as Error, 'saving to folder');
+        logger.error(`Error saving to folder, ${(error as Error).message}`);
     }
 };
 
 export const loadSaveFolder = async (
     folderPath: string = defaultSavePath
-): Promise<Data> => {
+): Promise<Data | null> => {
     const paths = getFilePaths(folderPath);
 
     try {
-        logger.info(`Loading save folder: ${folderPath}`);
+        logger.info(`Loading data from: ${folderPath}`);
 
         const [dataContent, nameIdDataContent, excludedCoordinatesContent] =
             await Promise.all([
@@ -61,8 +55,8 @@ export const loadSaveFolder = async (
             excludedCoordinates: JSON.parse(excludedCoordinatesContent)
         };
     } catch (error) {
-        handleFileError(error as Error, 'loading save folder');
-        return {} as Data;
+        logger.error(`Error loading save folder, ${(error as Error).message}`);
+        return null;
     }
 };
 

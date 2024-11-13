@@ -1,12 +1,12 @@
 import {HTTPResponse, Page, PuppeteerLaunchOptions} from "puppeteer";
 import {Context, Direction, DomElements, PageInstance} from "../types";
-import {pageLoggingColors, selectors, userAgents} from "./utils/data";
+import {pageLoggingColors, selectors, siteHeader, userAgents} from "./utils/data";
 import logger, {createColorizedLogger} from "./utils/logger";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import {createCursor} from "ghost-cursor";
 import chalk from "chalk";
-import {buildKeyFromCoordinates, formatCoordinates, parseCoordinatesFromUrl} from "./utils/common";
+import {buildKeyFromCoordinates, formatCoordinates, handleExit, parseCoordinatesFromUrl} from "./utils/common";
 import {Logger} from "winston";
 
 export const getDomElements = async (page: Page, _logger: Logger): Promise<DomElements> => {
@@ -97,6 +97,8 @@ const handleNetworkResponse = async (ctx: Context, page: PageInstance, response:
 }
 
 export const start = async (launchOptions: PuppeteerLaunchOptions, instanceCount: number): Promise<Context> => {
+    console.log(chalk.red(siteHeader))
+
     const browser = await puppeteer
         .use(StealthPlugin())
         .launch(launchOptions)
@@ -159,7 +161,9 @@ export const start = async (launchOptions: PuppeteerLaunchOptions, instanceCount
             page.active = false
 
             if (pages.every(p => !p.active)) {
-                logger.warn('All instances are disabled, exiting...')
+                handleExit(browserContext, 'All pages closed')
+                await browser.close()
+
                 process.exit(0)
             }
         })

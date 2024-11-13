@@ -1,10 +1,7 @@
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
-import {type Context, Context2, type Coordinates, type Data, Direction} from "../../types";
-import {Browser, Page} from "puppeteer";
-import {createCursor} from "ghost-cursor";
-import {getDomElements} from "../core";
+import {Context, type Coordinates, type Data, Direction} from "../../types";
 import logger from "./logger";
 import {defaultSavePath, saveFiles} from "./data";
 import chalk from "chalk";
@@ -19,6 +16,55 @@ const getFilePaths = (folderPath: string) =>
         ...acc,
         [key]: path.join(folderPath, fileName)
     }), {} as Record<keyof typeof saveFiles, string>);
+
+export const saveToFolderSync = (
+    folderPath = defaultSavePath,
+    {data, nameData, excludedCoordinates}: Data
+) => {
+    const paths = getFilePaths(folderPath);
+
+    try {
+        logger.info(`Saving to folder: ${folderPath}`);
+        fsSync.mkdirSync(folderPath, {recursive: true});
+
+        // todo: also save retryQueue
+        // todo: if file already exists, either merge or ask user if they want to overwrite
+        fsSync.writeFileSync(paths.data, JSON.stringify(data));
+        fsSync.writeFileSync(paths.nameIdData, JSON.stringify(nameData));
+        fsSync.writeFileSync(
+            paths.excludedCoordinates,
+            JSON.stringify(Array.from(excludedCoordinates))
+        );
+    } catch (error) {
+        handleFileError(error as Error, 'saving to folder');
+    }
+};
+
+export const loadSaveFolder = async (
+    folderPath: string = defaultSavePath
+): Promise<Data> => {
+    const paths = getFilePaths(folderPath);
+
+    try {
+        logger.info(`Loading save folder: ${folderPath}`);
+
+        const [dataContent, nameIdDataContent, excludedCoordinatesContent] =
+            await Promise.all([
+                fs.readFile(paths.data, 'utf-8'),
+                fs.readFile(paths.nameIdData, 'utf-8'),
+                fs.readFile(paths.excludedCoordinates, 'utf-8')
+            ]);
+
+        return {
+            data: JSON.parse(dataContent),
+            nameData: JSON.parse(nameIdDataContent),
+            excludedCoordinates: JSON.parse(excludedCoordinatesContent)
+        };
+    } catch (error) {
+        handleFileError(error as Error, 'loading save folder');
+        return {} as Data;
+    }
+};
 
 export const parseCoordinatesFromUrl = (url: string): [Coordinates, Direction] => {
     const parsedUrl = new URL(url)
@@ -56,59 +102,9 @@ export const shouldScrapeCoordinate = (coordinates: Coordinates, data: Data): bo
     return !(data.excludedCoordinates.has(key) || (data.data[key] && !data.data[key].every((val: any) => val === null)));
 }
 
-const handleExit = (context: Context2, reason: string) => {
+export const handleExit = (context: Context, reason: string) => {
     logger.warn(`${reason}, saving state and exiting...`);
 
-    // todo: update this function
-    //saveToFolderSync(process.env.OUTPUT_PATH, {data, nameIdData, excludedCoordinates})
+    saveToFolderSync(process.env.OUTPUT_PATH, context as Data);
     process.exit(0)
 }
-
-export const saveToFolderSync = (
-    folderPath = defaultSavePath,
-    {data, nameIdData, excludedCoordinates}: Data
-) => {
-    const paths = getFilePaths(folderPath);
-
-    try {
-        logger.info(`Saving to folder: ${folderPath}`);
-        fsSync.mkdirSync(folderPath, {recursive: true});
-
-        // todo: also save retryQueue
-        // todo: if file already exists, either merge or ask user if they want to overwrite
-        fsSync.writeFileSync(paths.data, JSON.stringify(data));
-        fsSync.writeFileSync(paths.nameIdData, JSON.stringify(nameIdData));
-        fsSync.writeFileSync(
-            paths.excludedCoordinates,
-            JSON.stringify(Array.from(excludedCoordinates))
-        );
-    } catch (error) {
-        handleFileError(error as Error, 'saving to folder');
-    }
-};
-
-export const loadSaveFolder = async (
-    folderPath: string = defaultSavePath
-): Promise<Data> => {
-    const paths = getFilePaths(folderPath);
-
-    try {
-        logger.info(`Loading save folder: ${folderPath}`);
-
-        const [dataContent, nameIdDataContent, excludedCoordinatesContent] =
-            await Promise.all([
-                fs.readFile(paths.data, 'utf-8'),
-                fs.readFile(paths.nameIdData, 'utf-8'),
-                fs.readFile(paths.excludedCoordinates, 'utf-8')
-            ]);
-
-        return {
-            data: JSON.parse(dataContent),
-            nameIdData: JSON.parse(nameIdDataContent),
-            excludedCoordinates: JSON.parse(excludedCoordinatesContent)
-        };
-    } catch (error) {
-        handleFileError(error as Error, 'loading save folder');
-        return {} as Data;
-    }
-};

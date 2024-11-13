@@ -1,15 +1,15 @@
-import {ElementHandle, HTTPResponse, Page, PuppeteerLaunchOptions} from "puppeteer";
-import {type Context, Context2, Direction, DomElements, PageInstance} from "../types";
+import {HTTPResponse, Page, PuppeteerLaunchOptions} from "puppeteer";
+import {Context, Direction, DomElements, PageInstance} from "../types";
 import {pageLoggingColors, selectors, userAgents} from "./utils/data";
 import logger, {createColorizedLogger} from "./utils/logger";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
-import {createCursor, GhostCursor} from "ghost-cursor";
+import {createCursor} from "ghost-cursor";
 import chalk from "chalk";
 import {buildKeyFromCoordinates, formatCoordinates, parseCoordinatesFromUrl} from "./utils/common";
 import {Logger} from "winston";
 
-export const getDomElements = async (page: Page, pageLogger: Logger): Promise<DomElements> => {
+export const getDomElements = async (page: Page, _logger: Logger): Promise<DomElements> => {
     const [fields, directions] = await Promise.all([
         page.$$(selectors.hintPositionFields),
         // for directions, we target the icon otherwise ghost-cursor will fail to click on it
@@ -17,7 +17,7 @@ export const getDomElements = async (page: Page, pageLogger: Logger): Promise<Do
     ])
 
     if (fields.length !== 3 || directions.length !== 4) {
-        pageLogger.error(`Invalid DOM structure, expected 3 fields and 4 directions, got ${fields.length} fields and ${directions.length} directions`)
+        _logger.error(`Invalid DOM structure, expected 3 fields and 4 directions, got ${fields.length} fields and ${directions.length} directions`)
         process.exit(1)
     }
 
@@ -29,21 +29,7 @@ export const getDomElements = async (page: Page, pageLogger: Logger): Promise<Do
     }
 }
 
-export const updateInputValue = async (element: ElementHandle, value: string, cursor?: GhostCursor) => {
-    if (cursor) {
-        await cursor.move(element)
-    }
-    await element.click({count: 3})
-    await element.press('Backspace')
-    await element.type(value, {delay: 100})
-}
-
-export const clickDirection = async (ctx: Context, direction: Direction) => {
-    await ctx.cursor.click(ctx.elements.directions[direction])
-    await ctx.page.waitForNetworkIdle()
-}
-
-const handleNetworkResponse = async (ctx: Context2, page: PageInstance, response: HTTPResponse) => {
+const handleNetworkResponse = async (ctx: Context, page: PageInstance, response: HTTPResponse) => {
     const [coordinates, direction] = parseCoordinatesFromUrl(response.url())
 
     if (response.status() === 503) {
@@ -110,21 +96,21 @@ const handleNetworkResponse = async (ctx: Context2, page: PageInstance, response
     data[key] = keyData
 }
 
-export const start = async (launchOptions: PuppeteerLaunchOptions, instanceCount: number): Promise<Context2> => {
+export const start = async (launchOptions: PuppeteerLaunchOptions, instanceCount: number): Promise<Context> => {
     const browser = await puppeteer
         .use(StealthPlugin())
         .launch(launchOptions)
     const pages: PageInstance[] = await Promise.all([...Array(instanceCount)].map(async (_, idx) => {
-        const newPage = await browser.newPage()
-        const newPageLogger = createColorizedLogger(pageLoggingColors[idx % pageLoggingColors.length], `Instance ${idx + 1}`)
+        const page = await browser.newPage()
+        const pageLogger = createColorizedLogger(pageLoggingColors[idx % pageLoggingColors.length], `Instance ${idx + 1}`)
         const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)]
 
-        await newPage.setUserAgent(userAgent)
-        newPageLogger.info(`Connecting to ${pageLoggingColors[idx].bold('https://dofusdb.fr/fr/tools/treasure-hunt')} with user-agent: ${pageLoggingColors[idx].bold(userAgent)}`)
-        await newPage.goto('https://dofusdb.fr/fr/tools/treasure-hunt')
-        newPageLogger.info('Connected, configuring page...')
+        await page.setUserAgent(userAgent)
+        pageLogger.info(`Connecting to ${pageLoggingColors[idx].bold('https://dofusdb.fr/fr/tools/treasure-hunt')} with user-agent: ${pageLoggingColors[idx].bold(userAgent)}`)
+        await page.goto('https://dofusdb.fr/fr/tools/treasure-hunt')
+        pageLogger.info('Connected, configuring page...')
         // disable all modals to fasten the scraping process
-        await newPage.evaluate(() => {
+        await page.evaluate(() => {
             const style = document.createElement('style');
             style.innerHTML = `
             .q-dialog {
@@ -133,36 +119,38 @@ export const start = async (launchOptions: PuppeteerLaunchOptions, instanceCount
         `;
             document.head.appendChild(style);
         });
-        let cursor = createCursor(newPage)
-        let elements = await getDomElements(newPage, newPageLogger)
+        let cursor = createCursor(page)
+        let elements = await getDomElements(page, pageLogger)
 
-        newPageLogger.info(`Instance ${idx + 1} ready !`)
+        pageLogger.info(`Instance ${idx + 1} ready !`)
 
         return {
-            browser,
-            page: newPage,
+            page: page,
             cursor,
             elements,
-            logger: newPageLogger,
+            logger: pageLogger,
             active: true,
             paused: false,
         }
     }))
-    const browserContext: Context2 = {
+    const browserContext: Context = {
         buffer: {},
         data: {},
         nameData: {},
         excludedCoordinates: new Set<string>(),
         browser,
-        pages
+        pages,
+        onGoingRequests: 0
     }
 
-    logger.info('Setting up instances event listeners...');
+    logger.info('Setting up instances event listeners.');
 
     pages.forEach((page) => {
         page.page.on('response', async (response) => {
             if (response.url().startsWith('https://api.dofusdb.fr/treasure-hunt') && response.request().method() === "GET") {
                 await handleNetworkResponse(browserContext, page, response)
+                // todo: only decrement if we're not in manual mode
+                browserContext.onGoingRequests--
             }
         })
 
@@ -176,6 +164,8 @@ export const start = async (launchOptions: PuppeteerLaunchOptions, instanceCount
             }
         })
     })
+
+    logger.info('Instances ready ! Start scraping.');
 
     return browserContext
 }

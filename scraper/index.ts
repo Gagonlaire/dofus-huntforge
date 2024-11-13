@@ -1,36 +1,49 @@
 require('dotenv').config()
+import {ElementHandle} from "puppeteer";
 import chalk from 'chalk';
 import {siteHeader} from "./src/utils/data";
-import {Context, Coordinates, Direction} from "./types";
+import {Coordinates, Direction, PageInstance} from "./types";
 import {
+    handleExit,
     loadSaveFolder,
-    randomSleep
+    randomSleep,
 } from "./src/utils/common";
-import {clickDirection, updateInputValue, start} from "./src/core";
+import {start} from "./src/core";
+import {GhostCursor} from "ghost-cursor";
 
-// todo: add a variable to keep track of the number of ongoing requests,
-//  avoid quitting when stack is empty but requests are still pending
-// buffer which position/direction has been fetched
-
-const getHintsForPosition = async (ctx: Context, {x, y}: Coordinates, direction?: Direction) => {
-    if (!ctx.lastCoordinates || ctx.lastCoordinates.x !== x) {
-        await updateInputValue(ctx.elements.x, x.toString(), ctx.cursor)
+export const updateInputValue = async (element: ElementHandle, value: string, cursor?: GhostCursor) => {
+    if (cursor) {
+        await cursor.move(element)
     }
-    if (!ctx.lastCoordinates || ctx.lastCoordinates.y !== y) {
-        await updateInputValue(ctx.elements.y, y.toString(), ctx.cursor)
+    await element.click({count: 3})
+    await element.press('Backspace')
+    await element.type(value, {delay: 100})
+}
+
+export const clickDirection = async (instance: PageInstance, direction: Direction) => {
+    await instance.cursor.click(instance.elements.directions[direction])
+    await instance.page.waitForNetworkIdle()
+}
+
+const getHintsForPosition = async (instance: PageInstance, {x, y}: Coordinates, direction?: Direction) => {
+    if (!instance.lastCoordinates || instance.lastCoordinates.x !== x) {
+        await updateInputValue(instance.elements.x, x.toString(), instance.cursor)
+    }
+    if (!instance.lastCoordinates || instance.lastCoordinates.y !== y) {
+        await updateInputValue(instance.elements.y, y.toString(), instance.cursor)
     }
 
     await randomSleep()
 
     if (direction !== undefined) {
-        await clickDirection(ctx, direction)
+        await clickDirection(instance, direction)
     } else {
         for (let i = 0; i < 4; i++) {
-            await clickDirection(ctx, i as Direction)
+            await clickDirection(instance, i as Direction)
         }
     }
 
-    ctx.lastCoordinates = {x, y}
+    instance.lastCoordinates = {x, y}
 }
 
 (async () => {
@@ -54,14 +67,12 @@ const getHintsForPosition = async (ctx: Context, {x, y}: Coordinates, direction?
     const manual = process.env.MANUAL === 'true'
     const headless = process.env.HEADLESS ? process.env.HEADLESS === 'true' : !manual
 
-    const ctx =  await start({
+    const ctx = await start({
         headless,
         executablePath: process.env.EXECUTABLE_PATH,
         userDataDir: process.env.USER_DATA_DIR,
     }, instanceCount)
 })()
 
-/*
-process.on('SIGINT', handleExit)
-process.on('SIGTERM', handleExit)
-*/
+/*process.on('SIGINT', handleExit)
+process.on('SIGTERM', handleExit)*/

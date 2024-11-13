@@ -9,12 +9,6 @@ export enum Direction {
     WEST = 3
 }
 
-export interface Data {
-    data: any;
-    nameIdData: any;
-    excludedCoordinates: Set<string>;
-}
-
 export interface Coordinates {
     x: number;
     y: number;
@@ -28,24 +22,6 @@ export interface DomElements {
     hints: ElementHandle;
 }
 
-export interface Context {
-    page: Page;
-    browser: Browser;
-    cursor: GhostCursor;
-    elements: DomElements;
-    lastCoordinates?: Coordinates;
-    retryQueue: {coordinates: Coordinates, direction: Direction}[];
-}
-
-export interface Context2 {
-    buffer: any;
-    browser: Browser;
-    pages: PageInstance[];
-    data: any;
-    nameData: any;
-    excludedCoordinates: Set<string>;
-}
-
 export interface PageInstance {
     page: Page;
     cursor: GhostCursor;
@@ -57,4 +33,18 @@ export interface PageInstance {
     // if an instance fail to setup, it will be disabled
     active: boolean;
     elements: DomElements;
+}
+
+export interface Data {
+    data: any;
+    nameData: any;
+    excludedCoordinates: Set<string>;
+}
+
+export interface Context extends Data {
+    buffer: any;
+    browser: Browser;
+    pages: PageInstance[];
+    // avoid quitting before all requests are done
+    onGoingRequests: number;
 }

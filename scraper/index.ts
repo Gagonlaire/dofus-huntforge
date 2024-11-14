@@ -80,9 +80,13 @@ const getHintsForPosition = async (
         while (ctx.queue.length !== 0) {
             const items = ctx.queue.splice(0, config.instanceCount)
 
-            await Promise.all(items.map(([coordinates, direction], idx) => {
-                return getHintsForPosition(ctx, ctx.pages[idx], coordinates, direction)
-            }))
+            try {
+                await Promise.all(items.map(([coordinates, direction], idx) => {
+                    return getHintsForPosition(ctx, ctx.pages[idx], coordinates, direction)
+                }))   
+            } catch (e) {
+                handleExit(ctx, (e as Error).message)
+            }
         }
 
         while (ctx.onGoingRequests > 0) {

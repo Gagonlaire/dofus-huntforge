@@ -49,26 +49,50 @@ HEADLESS=true
 Controls browser visibility. When `true`, browser runs in background. Note: This setting overrides the `MANUAL`
 variable.
 
-## Output Path
+## Save Output Path
 
 ```
-OUTPUT_PATH=example/path
+SAVE_OUTPUT_PATH=example/path
 ```
 
 Destination path for generated data and results from the program's execution.
 
-## Load Save
+## Save Input Path
 
 ```
-LOAD_SAVE=false
+SAVE_INPUT_PATH=example/path
 ```
 
-Toggle for loading previously saved progress. When enabled, the program will resume from the last saved state.
+Source path for input data. This is useful for resuming previous scraping.
 
-## Save Path
+## Overwrite Save
 
 ```
-SAVE_PATH=example/path
+OVERWRITE_SAVE=false
 ```
 
-Location for saving program progress. Used in conjunction with `LOAD_SAVE` to store and retrieve program state.
+If input/output save path differs, this fal control whether to overwrite the output file.
+
+## Args
+
+```
+ARGS=--no-sandbox,--disable-setuid-sandbox
+```
+
+Comma-separated list of additional arguments to pass to the browser instance.
+
+## Pages
+
+```
+PAGES=1
+```
+
+Number of browser pages to open. This can help speed up scraping but may increase the risk of detection.
+
+## Map Bounds
+
+```
+MAP_BOUNDS=-88,-70,36,48
+```
+
+Comma-separated list of map boundaries, must follow the format '<minX>,<minY>,<maxX>,<maxY>'.

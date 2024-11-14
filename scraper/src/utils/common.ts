@@ -1,9 +1,9 @@
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
-import {type Config, Context, type Coordinates, type Data, Direction, QueueItem} from "../../types";
+import {type Config, Context, type Coordinates, type Data, Direction, type MapBounds, QueueItem} from "../../types";
 import logger from "./logger";
-import {defaultSavePath, mapCoordinatesBounds, printFooter, saveFiles} from "./data";
+import {defaultSavePath, defaultMapBounds, printFooter, saveFiles} from "./data";
 import chalk from "chalk";
 
 const getFilePaths = (folderPath: string) =>
@@ -12,6 +12,12 @@ const getFilePaths = (folderPath: string) =>
         [key]: path.join(folderPath, fileName)
     }), {} as Record<keyof typeof saveFiles, string>);
 
+const parseMapBounds = (bounds: string): MapBounds => {
+    const [minX, minY, maxX, maxY] = bounds.split(',').map(Number);
+
+    return {minX, minY, maxX, maxY};
+}
+
 export const parseConfigFromEnv = (): Config => {
     const manual = process.env.MANUAL === 'true'
     // headless always take priority over manual
@@ -19,12 +25,37 @@ export const parseConfigFromEnv = (): Config => {
     const config: Config = {
         manual,
         headless,
-        instanceCount: Number(process.env.INSTANCE_COUNT) || 1,
+        instanceCount: Number(process.env.PAGES) || 1,
         executablePath: process.env.EXECUTABLE_PATH,
         userDataDir: process.env.USER_DATA_DIR,
-        overwrite: process.env.OVERWRITE === 'true',
+        overwriteSave: process.env.OVERWRITE_SAVE === 'true',
+        args: process.env.ARGS ? process.env.ARGS.split(',') : ['--no-sandbox', '--disable-setuid-sandbox'],
+        mapBounds: process.env.MAP_BOUNDS ? parseMapBounds(process.env.MAP_BOUNDS) : defaultMapBounds,
         saveInputPath: process.env.SAVE_INPUT_PATH || defaultSavePath,
         saveOutputPath: process.env.SAVE_OUTPUT_PATH || defaultSavePath
+    }
+
+    // validate mapBounds if some are provided
+    if (process.env.MAP_BOUNDS) {
+        if (config.mapBounds.minX >= config.mapBounds.maxX || config.mapBounds.minY >= config.mapBounds.maxY) {
+            logger.error('Invalid map bounds, min values must be lower than max values.')
+            process.exit(1)
+        }
+        if (Object.values(config.mapBounds).some(isNaN)) {
+            logger.error('Invalid map bounds, all values must be numbers.')
+            process.exit(1)
+        }
+        if (config.mapBounds.minX < defaultMapBounds.minX ||
+            config.mapBounds.minY < defaultMapBounds.minY ||
+            config.mapBounds.maxX > defaultMapBounds.maxX ||
+            config.mapBounds.maxY > defaultMapBounds.maxY) {
+            logger.warn('Map bounds are outside the default bounds, this might cause issues.')
+        }
+    }
+
+    // warn about recommended args not present, especially in CI/CD environments
+    if (!config.args.includes('--no-sandbox') || !config.args.includes('--disable-setuid-sandbox')) {
+        logger.warn('You are using custom args, but missing --no-sandbox or --disable-setuid-sandbox. This might cause issues.')
     }
 
     // if manual mode is enabled, we set the instance count to 1
@@ -34,7 +65,7 @@ export const parseConfigFromEnv = (): Config => {
     }
 
     // if target dir exists and input dir !== target dir, data might be unintentionally overwritten so we ask for the overwrite flag
-    if (fsSync.existsSync(config.saveOutputPath) && config.saveInputPath !== config.saveOutputPath && !config.overwrite) {
+    if (fsSync.existsSync(config.saveOutputPath) && config.saveInputPath !== config.saveOutputPath && !config.overwriteSave) {
         logger.error(`Output path ${config.saveOutputPath} would be overwritten, set OVERWRITE=true or change the SAVE_OUTPUT_PATH.`)
         process.exit(1)
     }
@@ -124,19 +155,19 @@ export const buildKeyFromCoordinates = (coordinates: Coordinates): string => {
     return `${coordinates.x},${coordinates.y}`;
 }
 
-export const createQueue = (data: Data): QueueItem[] => {
+export const createQueue = (context: Context, config: Config): QueueItem[] => {
     const queue: QueueItem[] = [];
     let skipCount = 0;
     let skipStart: Coordinates;
     let skipEnd: Coordinates;
 
     logger.warn('Scraper in automatic mode, building positions to scrape.')
-    for (let y = mapCoordinatesBounds.minY; y <= mapCoordinatesBounds.maxY; y++) {
-        for (let x = mapCoordinatesBounds.minX; x <= mapCoordinatesBounds.maxX; x++) {
+    for (let y = config.mapBounds.minY; y <= config.mapBounds.maxY; y++) {
+        for (let x = config.mapBounds.minX; x <= config.mapBounds.maxX; x++) {
             const coordinates = {x, y};
             const key = buildKeyFromCoordinates(coordinates);
 
-            if (!data.excludedCoordinates.has(key) && !data.data[key]) {
+            if (!context.excludedCoordinates.has(key) && !context.data[key]) {
                 if (skipCount !== 0) {
                     logger.info(`Skipping ${skipCount} coordinates from ${formatCoordinates(skipStart!)} to ${formatCoordinates(skipEnd!)}`);
                     skipCount = 0;

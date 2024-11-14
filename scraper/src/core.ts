@@ -9,18 +9,18 @@ import chalk from "chalk";
 import {buildKeyFromCoordinates, formatCoordinates, handleExit, parseCoordinatesFromUrl} from "./utils/common";
 import {Logger} from "winston";
 
-const handleNetworkResponse = async (ctx: Context, page: PageInstance, response: HTTPResponse) => {
+const handleNetworkResponse = async (context: Context, page: PageInstance, response: HTTPResponse) => {
     const [coordinates, direction] = parseCoordinatesFromUrl(response.url())
 
     if (response.status() === 503) {
         page.logger.warn(`Request blocked by reCAPTCHA for ${formatCoordinates(coordinates)} -> ${chalk.bold(Direction[direction])}`)
-        ctx.queue.push([coordinates, direction])
+        context.queue.push([coordinates, direction])
         return
     }
 
     const data = response.ok() ? (await response.json()).data : []
     const key = buildKeyFromCoordinates(coordinates)
-    let keyData = ctx.data[key] || new Array(4)
+    let keyData = context.data[key] || new Array(4)
     const hintMap = new Map<number, any>()
 
     if (data.length > 0) {
@@ -29,9 +29,9 @@ const handleNetworkResponse = async (ctx: Context, page: PageInstance, response:
 
     data.forEach((hint: any) => {
         hint.pois.forEach((poi: any) => {
-            if (!ctx.nameData[poi.nameId]) {
+            if (!context.nameData[poi.nameId]) {
                 delete poi.name.id
-                ctx.nameData[poi.nameId] = poi.name
+                context.nameData[poi.nameId] = poi.name
             }
         })
 
@@ -52,8 +52,8 @@ const handleNetworkResponse = async (ctx: Context, page: PageInstance, response:
         }
     })
 
-    ctx.buffer[key] = (ctx.buffer[key] || 0) + 1
-    if (ctx.buffer[key] === 4) {
+    context.buffer[key] = (context.buffer[key] || 0) + 1
+    if (context.buffer[key] === 4) {
         let counts = [0, 0]
 
         keyData.forEach((direction: any) => {
@@ -63,24 +63,24 @@ const handleNetworkResponse = async (ctx: Context, page: PageInstance, response:
             }
         });
 
-        delete ctx.buffer[key]
+        delete context.buffer[key]
         page.logger.info(`Fetched ${formatCoordinates(coordinates)}, ${chalk.bold(counts[0])} maps, ${chalk.bold(counts[1])} hints`)
 
         if (counts[0] === 0) {
             delete data[key]
-            ctx.excludedCoordinates.add(key)
+            context.excludedCoordinates.add(key)
             return
         }
     }
 
-    if (!ctx.hasNewData) {
-        ctx.hasNewData = true
+    if (!context.hasNewData) {
+        context.hasNewData = true
     }
 
-    ctx.data[key] = keyData
+    context.data[key] = keyData
 }
 
-export const getDomElements = async (page: Page, _logger: Logger): Promise<DomElements> => {
+export const getDomElements = async (page: Page, pageLogger: Logger): Promise<DomElements> => {
     const [fields, directions] = await Promise.all([
         page.$$(selectors.hintPositionFields),
         // for directions, we target the icon otherwise ghost-cursor will fail to click on it
@@ -88,7 +88,7 @@ export const getDomElements = async (page: Page, _logger: Logger): Promise<DomEl
     ])
 
     if (fields.length !== 3 || directions.length !== 4) {
-        _logger.error(`Invalid DOM structure, expected 3 fields and 4 directions, got ${fields.length} fields and ${directions.length} directions`)
+        pageLogger.error(`Invalid DOM structure, expected 3 fields and 4 directions, got ${fields.length} fields and ${directions.length} directions`)
         process.exit(1)
     }
 
@@ -107,8 +107,7 @@ export const connect = async (config: Config): Promise<Context> => {
             headless: config.headless,
             executablePath: config.executablePath,
             userDataDir: config.userDataDir,
-            // todo: add a env variable to add and custom passed args
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            args: config.args
         })
 
     logger.info(`Connecting pages to ${chalk.bold.blue('https://dofusdb.fr/fr/tools/treasure-hunt')}.`)
@@ -145,12 +144,12 @@ export const connect = async (config: Config): Promise<Context> => {
         }
     }))
     const browserContext: Context = {
+        browser,
+        pages,
         buffer: {},
         data: {},
         nameData: {},
         excludedCoordinates: new Set<string>(),
-        browser,
-        pages,
         onGoingRequests: 0,
         queue: [],
         hasNewData: false

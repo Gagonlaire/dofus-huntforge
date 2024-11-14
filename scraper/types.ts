@@ -2,13 +2,22 @@ import type {ElementHandle, Page, Browser} from 'puppeteer'
 import type {GhostCursor} from "ghost-cursor";
 import {Logger} from "winston";
 
+export type MapBounds = {
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number
+}
+
 export interface Config {
     headless: boolean;
     manual: boolean;
     instanceCount: number;
-    overwrite: boolean;
+    overwriteSave: boolean;
     saveOutputPath: string;
     saveInputPath: string;
+    args: string[];
+    mapBounds: MapBounds;
     executablePath?: string;
     userDataDir?: string;
 }

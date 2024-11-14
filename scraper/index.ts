@@ -24,8 +24,6 @@ const updateInputValue = async (element: ElementHandle, value: string, cursor?: 
 
 const clickDirection = async (instance: PageInstance, direction: Direction) => {
     await instance.cursor.click(instance.elements.directions[direction])
-
-    // todo: this might not be necessary, maybe just put a lil sleep
     await instance.page.waitForNetworkIdle()
 }
 
@@ -75,7 +73,7 @@ const getHintsForPosition = async (
     if (config.manual) {
         logger.warn('Manual mode enabled. Go to the opened browser and start scraping.')
     } else {
-        ctx.queue = createQueue(ctx)
+        ctx.queue = createQueue(ctx, config)
 
         while (ctx.queue.length !== 0) {
             const items = ctx.queue.splice(0, config.instanceCount)
@@ -83,7 +81,7 @@ const getHintsForPosition = async (
             try {
                 await Promise.all(items.map(([coordinates, direction], idx) => {
                     return getHintsForPosition(ctx, ctx.pages[idx], coordinates, direction)
-                }))   
+                }))
             } catch (e) {
                 handleExit(ctx, (e as Error).message)
             }

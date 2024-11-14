@@ -60,4 +60,5 @@ export interface Context extends Data {
     onGoingRequests: number;
     // store requests to dispatch
     queue: any[];
+    hasNewData: boolean;
 }

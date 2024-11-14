@@ -3,7 +3,7 @@ import * as fsSync from 'fs';
 import * as path from 'path';
 import {type Config, Context, type Coordinates, type Data, Direction} from "../../types";
 import logger from "./logger";
-import {defaultSavePath, saveFiles} from "./data";
+import {defaultSavePath, mapCoordinatesBounds, printFooter, saveFiles} from "./data";
 import chalk from "chalk";
 
 const getFilePaths = (folderPath: string) =>
@@ -27,14 +27,19 @@ export const parseConfigFromEnv = (): Config => {
         saveOutputPath: process.env.SAVE_OUTPUT_PATH || defaultSavePath
     }
 
-    logger.info('Configuration loaded successfully.', config);
+    // if manual mode is enabled, we set the instance count to 1
+    if (config.manual && config.instanceCount !== 1) {
+        logger.warn('Manual mode enabled, setting instance count to 1.')
+        config.instanceCount = 1
+    }
 
-    // if target dir exists and input dir !== target dir, data might be unintentionally overwritten
-    // so we ask for the overwrite flag
+    // if target dir exists and input dir !== target dir, data might be unintentionally overwritten so we ask for the overwrite flag
     if (fsSync.existsSync(config.saveOutputPath) && config.saveInputPath !== config.saveOutputPath && !config.overwrite) {
         logger.error(`Output path ${config.saveOutputPath} would be overwritten, set OVERWRITE=true or change the SAVE_OUTPUT_PATH.`)
         process.exit(1)
     }
+
+    logger.info('Configuration loaded successfully.', config);
 
     return config
 }
@@ -46,7 +51,7 @@ export const saveToFolderSync = (
     const paths = getFilePaths(folderPath);
 
     try {
-        logger.info(`Saving to folder '${folderPath}'`);
+        logger.info(`Saving to folder '${folderPath}'.`);
 
         fsSync.mkdirSync(folderPath, {recursive: true});
         fsSync.writeFileSync(paths.data, JSON.stringify(data));
@@ -57,7 +62,7 @@ export const saveToFolderSync = (
         );
         logger.info('Data saved successfully.');
     } catch (error) {
-        logger.error(`Error saving to folder, ${(error as Error).message}`);
+        logger.error(`Error saving to folder, ${(error as Error).message}.`);
     }
 };
 
@@ -67,7 +72,7 @@ export const loadSaveFolder = async (
     const paths = getFilePaths(folderPath);
 
     try {
-        logger.info(`Loading data from folder '${folderPath}'`);
+        logger.info(`Loading data from folder '${folderPath}'.`);
 
         const [dataContent, nameIdDataContent, excludedCoordinatesContent] =
             await Promise.all([
@@ -119,15 +124,47 @@ export const buildKeyFromCoordinates = (coordinates: Coordinates): string => {
     return `${coordinates.x},${coordinates.y}`;
 }
 
-export const shouldScrapeCoordinate = (coordinates: Coordinates, data: Data): boolean => {
-    const key = buildKeyFromCoordinates(coordinates)
+export const createQueue = (data: Data): any[] => {
+    let queue: any[] = [];
+    let skipCount = 0;
+    let skipStart: Coordinates;
+    let skipEnd: Coordinates;
 
-    return !(data.excludedCoordinates.has(key) || (data.data[key] && !data.data[key].every((val: any) => val === null)));
-}
+    logger.info('Creating queue...');
+    for (let y = mapCoordinatesBounds.minY; y <= mapCoordinatesBounds.maxY; y++) {
+        for (let x = mapCoordinatesBounds.minX; x <= mapCoordinatesBounds.maxX; x++) {
+            const coordinates = {x, y};
+            const key = buildKeyFromCoordinates(coordinates);
+
+            if (!data.excludedCoordinates.has(key) && !data.data[key]) {
+                if (skipCount !== 0) {
+                    logger.info(`Skipping ${skipCount} coordinates from ${formatCoordinates(skipStart!)} to ${formatCoordinates(skipEnd!)}`);
+                    skipCount = 0;
+                }
+
+                queue.push(coordinates);
+            } else {
+                if (skipCount === 0) {
+                    skipStart = coordinates;
+                }
+                skipEnd = coordinates;
+                skipCount++;
+            }
+        }
+    }
+    logger.info(`Queue created successfully. ${queue.length} coordinates to scrape.`);
+
+    return queue;
+};
 
 export const handleExit = (context: Context, reason: string) => {
-    logger.warn(`${reason}. Saving state and exiting...`);
+    if (context.hasNewData) {
+        logger.warn(`${reason}. Saving state and exiting...`);
 
-    saveToFolderSync(process.env.OUTPUT_PATH, context as Data);
+        saveToFolderSync(process.env.OUTPUT_PATH, context as Data);
+        printFooter();
+    } else {
+        logger.warn(`${reason}. Exiting...`);
+    }
     process.exit(0)
 }

@@ -1,6 +1,6 @@
 import {HTTPResponse, Page} from "puppeteer";
 import {Config, Context, Direction, DomElements, PageInstance} from "../types";
-import {pageLoggingColors, selectors, userAgents} from "./utils/data";
+import {pageLoggingColors, printFooter, selectors, userAgents} from "./utils/data";
 import logger, {createColorizedLogger} from "./utils/logger";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
@@ -8,26 +8,6 @@ import {createCursor} from "ghost-cursor";
 import chalk from "chalk";
 import {buildKeyFromCoordinates, formatCoordinates, handleExit, parseCoordinatesFromUrl} from "./utils/common";
 import {Logger} from "winston";
-
-export const getDomElements = async (page: Page, _logger: Logger): Promise<DomElements> => {
-    const [fields, directions] = await Promise.all([
-        page.$$(selectors.hintPositionFields),
-        // for directions, we target the icon otherwise ghost-cursor will fail to click on it
-        page.$$(selectors.hintDirectionButtons)
-    ])
-
-    if (fields.length !== 3 || directions.length !== 4) {
-        _logger.error(`Invalid DOM structure, expected 3 fields and 4 directions, got ${fields.length} fields and ${directions.length} directions`)
-        process.exit(1)
-    }
-
-    return {
-        x: fields[0],
-        y: fields[1],
-        directions: directions,
-        hints: fields[2]
-    }
-}
 
 const handleNetworkResponse = async (ctx: Context, page: PageInstance, response: HTTPResponse) => {
     const [coordinates, direction] = parseCoordinatesFromUrl(response.url())
@@ -84,7 +64,7 @@ const handleNetworkResponse = async (ctx: Context, page: PageInstance, response:
         });
 
         delete ctx.buffer[key]
-        page.logger.info(`Fetched ${formatCoordinates(coordinates)} -> ${chalk.bold(Direction[direction])}, ${chalk.bold(counts[0])} maps, ${chalk.bold(counts[1])} hints`)
+        page.logger.info(`Fetched ${formatCoordinates(coordinates)}, ${chalk.bold(counts[0])} maps, ${chalk.bold(counts[1])} hints`)
 
         if (counts[0] === 0) {
             delete data[key]
@@ -93,7 +73,31 @@ const handleNetworkResponse = async (ctx: Context, page: PageInstance, response:
         }
     }
 
-    data[key] = keyData
+    if (!ctx.hasNewData) {
+        ctx.hasNewData = true
+    }
+
+    ctx.data[key] = keyData
+}
+
+export const getDomElements = async (page: Page, _logger: Logger): Promise<DomElements> => {
+    const [fields, directions] = await Promise.all([
+        page.$$(selectors.hintPositionFields),
+        // for directions, we target the icon otherwise ghost-cursor will fail to click on it
+        page.$$(selectors.hintDirectionButtons)
+    ])
+
+    if (fields.length !== 3 || directions.length !== 4) {
+        _logger.error(`Invalid DOM structure, expected 3 fields and 4 directions, got ${fields.length} fields and ${directions.length} directions`)
+        process.exit(1)
+    }
+
+    return {
+        x: fields[0],
+        y: fields[1],
+        directions: directions,
+        hints: fields[2]
+    }
 }
 
 export const connect = async (config: Config): Promise<Context> => {
@@ -103,17 +107,19 @@ export const connect = async (config: Config): Promise<Context> => {
             headless: config.headless,
             executablePath: config.executablePath,
             userDataDir: config.userDataDir,
+            // todo: add a env variable to add and custom passed args
             args: ['--no-sandbox', '--disable-setuid-sandbox']
         })
+
+    logger.info(`Connecting pages to ${chalk.bold.blue('https://dofusdb.fr/fr/tools/treasure-hunt')}.`)
     const pages: PageInstance[] = await Promise.all([...Array(config.instanceCount)].map(async (_, idx) => {
         const page = await browser.newPage()
-        const pageLogger = createColorizedLogger(pageLoggingColors[idx % pageLoggingColors.length], `instance ${idx + 1}`)
+        const pageLogger = createColorizedLogger(pageLoggingColors[idx % pageLoggingColors.length], `page ${idx + 1}`)
         const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)]
 
         await page.setUserAgent(userAgent)
-        pageLogger.info(`Connecting to ${pageLoggingColors[idx].bold('https://dofusdb.fr/fr/tools/treasure-hunt')} with user-agent: ${pageLoggingColors[idx].bold(userAgent)}`)
+        pageLogger.info(`Connecting and configuring page with user-agent: ${pageLoggingColors[idx].bold(userAgent)}`)
         await page.goto('https://dofusdb.fr/fr/tools/treasure-hunt')
-        pageLogger.info('Connected, configuring page...')
         // disable all modals to fasten the scraping process
         await page.evaluate(() => {
             const style = document.createElement('style');
@@ -127,7 +133,7 @@ export const connect = async (config: Config): Promise<Context> => {
         let cursor = createCursor(page)
         let elements = await getDomElements(page, pageLogger)
 
-        pageLogger.info(`Instance ${idx + 1} ready !`)
+        pageLogger.info(`Page ${idx + 1} ready !`)
 
         return {
             page: page,
@@ -145,17 +151,21 @@ export const connect = async (config: Config): Promise<Context> => {
         excludedCoordinates: new Set<string>(),
         browser,
         pages,
-        onGoingRequests: 0
+        onGoingRequests: 0,
+        queue: [],
+        hasNewData: false
     }
 
-    logger.info('Setting up instances event listeners.');
+    logger.info('Setting up event listeners for all pages.');
 
     pages.forEach((page) => {
         page.page.on('response', async (response) => {
             if (response.url().startsWith('https://api.dofusdb.fr/treasure-hunt') && response.request().method() === "GET") {
                 await handleNetworkResponse(browserContext, page, response)
-                // todo: only decrement if we're not in manual mode
-                browserContext.onGoingRequests--
+
+                if (!config.manual) {
+                    browserContext.onGoingRequests--
+                }
             }
         })
 
@@ -165,14 +175,11 @@ export const connect = async (config: Config): Promise<Context> => {
 
             if (pages.every(p => !p.active)) {
                 handleExit(browserContext, 'All pages closed')
-                await browser.close()
 
-                process.exit(0)
+                await browser.close()
             }
         })
     })
-
-    logger.info('Instances ready! Start scraping.');
 
     return browserContext
 }

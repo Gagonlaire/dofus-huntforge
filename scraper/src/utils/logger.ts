@@ -24,7 +24,7 @@ export const createColorizedLogger = (colorFn: any, name: string) => {
         level: 'info',
         format: winston.format.combine(
             winston.format.splat(),
-            winston.format.printf(({ level, message }) => {
+            winston.format.printf(({level, message}) => {
                 if (level === 'error' || level === 'warn') {
                     return levelColors[level](`${name}: ${message}`);
                 }

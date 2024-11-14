@@ -1,15 +1,17 @@
 require('dotenv').config()
+import logger from "./src/utils/logger";
 import chalk from "chalk";
 import {ElementHandle} from "puppeteer";
-import {Config, Coordinates, Direction, PageInstance} from "./types";
+import {Context, Coordinates, Direction, PageInstance} from "./types";
 import {
+    createQueue,
     handleExit,
     loadSaveFolder, parseConfigFromEnv,
-    randomSleep,
+    randomSleep, sleep,
 } from "./src/utils/common";
 import {connect} from "./src/core";
 import {GhostCursor} from "ghost-cursor";
-import {siteHeader} from "./src/utils/data";
+import {footer, header, printFooter} from "./src/utils/data";
 
 const updateInputValue = async (element: ElementHandle, value: string, cursor?: GhostCursor) => {
     if (cursor) {
@@ -22,10 +24,17 @@ const updateInputValue = async (element: ElementHandle, value: string, cursor?: 
 
 const clickDirection = async (instance: PageInstance, direction: Direction) => {
     await instance.cursor.click(instance.elements.directions[direction])
+
+    // todo: this might not be necessary, maybe just put a lil sleep
     await instance.page.waitForNetworkIdle()
 }
 
-const getHintsForPosition = async (instance: PageInstance, {x, y}: Coordinates, direction?: Direction) => {
+const getHintsForPosition = async (
+    ctx: Context,
+    instance: PageInstance,
+    {x, y}: Coordinates,
+    direction?: Direction
+) => {
     if (!instance.lastCoordinates || instance.lastCoordinates.x !== x) {
         await updateInputValue(instance.elements.x, x.toString(), instance.cursor)
     }
@@ -36,9 +45,11 @@ const getHintsForPosition = async (instance: PageInstance, {x, y}: Coordinates, 
     await randomSleep()
 
     if (direction !== undefined) {
+        ctx.onGoingRequests++
         await clickDirection(instance, direction)
     } else {
         for (let i = 0; i < 4; i++) {
+            ctx.onGoingRequests++
             await clickDirection(instance, i as Direction)
         }
     }
@@ -47,12 +58,12 @@ const getHintsForPosition = async (instance: PageInstance, {x, y}: Coordinates, 
 }
 
 (async () => {
-    console.log(chalk.red(siteHeader))
+    console.log(chalk.red(header))
     // we need to register the exit handler before starting the browser
     process.on('SIGINT', (signal) => handleExit(ctx, signal))
     process.on('SIGTERM', (signal) => handleExit(ctx, signal))
 
-    const config: Config = parseConfigFromEnv();
+    const config = parseConfigFromEnv();
     const save = await loadSaveFolder(config.saveInputPath)
     const ctx = await connect(config)
 
@@ -60,5 +71,23 @@ const getHintsForPosition = async (instance: PageInstance, {x, y}: Coordinates, 
         ctx.data = save.data
         ctx.nameData = save.nameData
         ctx.excludedCoordinates = save.excludedCoordinates
+    }
+
+    if (config.manual) {
+        logger.warn('Manual mode enabled. Go to the opened browser and start scraping.')
+    } else {
+        logger.warn('Scraper in automatic mode, building positions to scrape.')
+        ctx.queue = createQueue(ctx)
+
+        while (ctx.queue.length !== 0) {
+            await sleep(1000)
+        }
+
+        // guard to wait for all requests to finish
+        while (ctx.onGoingRequests > 0) {
+            await sleep(250)
+        }
+
+        handleExit(ctx, 'Scraping finished')
     }
 })()

@@ -46,7 +46,7 @@ export const userAgents = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15"
 ]
 
-export const siteHeader = '\n\n  ██████  ▄████▄   ██▀███   ▄▄▄       ██▓███  ▓█████  ██▀███  \n' +
+export const header = '\n\n  ██████  ▄████▄   ██▀███   ▄▄▄       ██▓███  ▓█████  ██▀███  \n' +
     '▒██    ▒ ▒██▀ ▀█  ▓██ ▒ ██▒▒████▄    ▓██░  ██▒▓█   ▀ ▓██ ▒ ██▒\n' +
     '░ ▓██▄   ▒▓█    ▄ ▓██ ░▄█ ▒▒██  ▀█▄  ▓██░ ██▓▒▒███   ▓██ ░▄█ ▒\n' +
     '  ▒   ██▒▒▓▓▄ ▄██▒▒██▀▀█▄  ░██▄▄▄▄██ ▒██▄█▓▒ ▒▒▓█  ▄ ▒██▀▀█▄  \n' +
@@ -56,3 +56,20 @@ export const siteHeader = '\n\n  ██████  ▄████▄   ██
     '░  ░  ░  ░          ░░   ░   ░   ▒   ░░          ░     ░░   ░ \n' +
     '      ░  ░ ░         ░           ░  ░            ░  ░   ░     \n' +
     '         ░                                                    \n\n'
+
+export const footer = '\n\n ███▄    █  ▒█████  ▄▄▄█████▓▓█████ \n' +
+    ' ██ ▀█   █ ▒██▒  ██▒▓  ██▒ ▓▒▓█   ▀ \n' +
+    '▓██  ▀█ ██▒▒██░  ██▒▒ ▓██░ ▒░▒███   \n' +
+    '▓██▒  ▐▌██▒▒██   ██░░ ▓██▓ ░ ▒▓█  ▄ \n' +
+    '▒██░   ▓██░░ ████▓▒░  ▒██▒ ░ ░▒████▒\n' +
+    '░ ▒░   ▒ ▒ ░ ▒░▒░▒░   ▒ ░░   ░░ ▒░ ░\n' +
+    '░ ░░   ░ ▒░  ░ ▒ ▒░     ░     ░ ░  ░\n' +
+    '   ░   ░ ░ ░ ░ ░ ▒    ░         ░   \n' +
+    '         ░     ░ ░              ░  ░\n' +
+    '                                    \n\n'
+
+export const printFooter = () => {
+    console.log(chalk.red(footer))
+    console.log(`Thanks for using this tool, if you have any feedback or suggestion, feel free to open an issue at ${chalk.bold.blue('https://github.com/Gagonlaire/dofus-huntforge/issues/new')}`)
+    console.log(`Please take in consideration that ${chalk.bold.red('you are responsible of ALL data you got from this tool')}, use it wisely and don't share it with anyone.`)
+}

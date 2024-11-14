@@ -1,6 +1,6 @@
-import {HTTPResponse, Page, PuppeteerLaunchOptions} from "puppeteer";
-import {Context, Direction, DomElements, PageInstance} from "../types";
-import {pageLoggingColors, selectors, siteHeader, userAgents} from "./utils/data";
+import {HTTPResponse, Page} from "puppeteer";
+import {Config, Context, Direction, DomElements, PageInstance} from "../types";
+import {pageLoggingColors, selectors, userAgents} from "./utils/data";
 import logger, {createColorizedLogger} from "./utils/logger";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
@@ -96,15 +96,18 @@ const handleNetworkResponse = async (ctx: Context, page: PageInstance, response:
     data[key] = keyData
 }
 
-export const start = async (launchOptions: PuppeteerLaunchOptions, instanceCount: number): Promise<Context> => {
-    console.log(chalk.red(siteHeader))
-
+export const connect = async (config: Config): Promise<Context> => {
     const browser = await puppeteer
         .use(StealthPlugin())
-        .launch(launchOptions)
-    const pages: PageInstance[] = await Promise.all([...Array(instanceCount)].map(async (_, idx) => {
+        .launch({
+            headless: config.headless,
+            executablePath: config.executablePath,
+            userDataDir: config.userDataDir,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        })
+    const pages: PageInstance[] = await Promise.all([...Array(config.instanceCount)].map(async (_, idx) => {
         const page = await browser.newPage()
-        const pageLogger = createColorizedLogger(pageLoggingColors[idx % pageLoggingColors.length], `Instance ${idx + 1}`)
+        const pageLogger = createColorizedLogger(pageLoggingColors[idx % pageLoggingColors.length], `instance ${idx + 1}`)
         const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)]
 
         await page.setUserAgent(userAgent)
@@ -157,7 +160,7 @@ export const start = async (launchOptions: PuppeteerLaunchOptions, instanceCount
         })
 
         page.page.on('close', async () => {
-            page.logger.warn('Page closed, instance is now disabled')
+            page.logger.warn('Page closed, instance is now disabled.')
             page.active = false
 
             if (pages.every(p => !p.active)) {
@@ -169,7 +172,7 @@ export const start = async (launchOptions: PuppeteerLaunchOptions, instanceCount
         })
     })
 
-    logger.info('Instances ready ! Start scraping.');
+    logger.info('Instances ready! Start scraping.');
 
     return browserContext
 }

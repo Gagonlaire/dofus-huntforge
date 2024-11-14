@@ -2,6 +2,17 @@ import type {ElementHandle, Page, Browser} from 'puppeteer'
 import type {GhostCursor} from "ghost-cursor";
 import {Logger} from "winston";
 
+export interface Config {
+    headless: boolean;
+    manual: boolean;
+    instanceCount: number;
+    overwrite: boolean;
+    saveOutputPath: string;
+    saveInputPath: string;
+    executablePath?: string;
+    userDataDir?: string;
+}
+
 export enum Direction {
     NORTH = 0,
     EAST = 1,
@@ -47,4 +58,6 @@ export interface Context extends Data {
     pages: PageInstance[];
     // avoid quitting before all requests are done
     onGoingRequests: number;
+    // store requests to dispatch
+    queue: any[];
 }

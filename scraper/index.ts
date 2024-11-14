@@ -1,13 +1,15 @@
 require('dotenv').config()
+import chalk from "chalk";
 import {ElementHandle} from "puppeteer";
-import {Coordinates, Direction, PageInstance} from "./types";
+import {Config, Coordinates, Direction, PageInstance} from "./types";
 import {
     handleExit,
-    loadSaveFolder,
+    loadSaveFolder, parseConfigFromEnv,
     randomSleep,
 } from "./src/utils/common";
-import {start} from "./src/core";
+import {connect} from "./src/core";
 import {GhostCursor} from "ghost-cursor";
+import {siteHeader} from "./src/utils/data";
 
 const updateInputValue = async (element: ElementHandle, value: string, cursor?: GhostCursor) => {
     if (cursor) {
@@ -45,26 +47,18 @@ const getHintsForPosition = async (instance: PageInstance, {x, y}: Coordinates, 
 }
 
 (async () => {
+    console.log(chalk.red(siteHeader))
     // we need to register the exit handler before starting the browser
     process.on('SIGINT', (signal) => handleExit(ctx, signal))
     process.on('SIGTERM', (signal) => handleExit(ctx, signal))
 
-    const instanceCount = Number(process.env.INSTANCE_COUNT) || 1
-    const manual = process.env.MANUAL === 'true'
-    const headless = process.env.HEADLESS ? process.env.HEADLESS === 'true' : !manual
-    const ctx = await start({
-        headless,
-        executablePath: process.env.EXECUTABLE_PATH,
-        userDataDir: process.env.USER_DATA_DIR,
-    }, instanceCount)
+    const config: Config = parseConfigFromEnv();
+    const save = await loadSaveFolder(config.saveInputPath)
+    const ctx = await connect(config)
 
-    if (process.env.LOAD_SAVE === 'true') {
-        const save = await loadSaveFolder(process.env.SAVE_PATH)
-
-        if (save) {
-            ctx.data = save.data
-            ctx.nameData = save.nameData
-            ctx.excludedCoordinates = save.excludedCoordinates
-        }
+    if (save) {
+        ctx.data = save.data
+        ctx.nameData = save.nameData
+        ctx.excludedCoordinates = save.excludedCoordinates
     }
 })()

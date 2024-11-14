@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
-import {Context, type Coordinates, type Data, Direction} from "../../types";
+import {type Config, Context, type Coordinates, type Data, Direction} from "../../types";
 import logger from "./logger";
 import {defaultSavePath, saveFiles} from "./data";
 import chalk from "chalk";
@@ -12,6 +12,33 @@ const getFilePaths = (folderPath: string) =>
         [key]: path.join(folderPath, fileName)
     }), {} as Record<keyof typeof saveFiles, string>);
 
+export const parseConfigFromEnv = (): Config => {
+    const manual = process.env.MANUAL === 'true'
+    // headless always take priority over manual
+    const headless = process.env.HEADLESS ? process.env.HEADLESS === 'true' : !manual
+    const config: Config = {
+        manual,
+        headless,
+        instanceCount: Number(process.env.INSTANCE_COUNT) || 1,
+        executablePath: process.env.EXECUTABLE_PATH,
+        userDataDir: process.env.USER_DATA_DIR,
+        overwrite: process.env.OVERWRITE === 'true',
+        saveInputPath: process.env.SAVE_INPUT_PATH || defaultSavePath,
+        saveOutputPath: process.env.SAVE_OUTPUT_PATH || defaultSavePath
+    }
+
+    logger.info('Configuration loaded successfully.', config);
+
+    // if target dir exists and input dir !== target dir, data might be unintentionally overwritten
+    // so we ask for the overwrite flag
+    if (fsSync.existsSync(config.saveOutputPath) && config.saveInputPath !== config.saveOutputPath && !config.overwrite) {
+        logger.error(`Output path ${config.saveOutputPath} would be overwritten, set OVERWRITE=true or change the SAVE_OUTPUT_PATH.`)
+        process.exit(1)
+    }
+
+    return config
+}
+
 export const saveToFolderSync = (
     folderPath = defaultSavePath,
     {data, nameData, excludedCoordinates}: Data
@@ -19,16 +46,16 @@ export const saveToFolderSync = (
     const paths = getFilePaths(folderPath);
 
     try {
-        logger.info(`Saving to folder: ${folderPath}`);
-        fsSync.mkdirSync(folderPath, {recursive: true});
+        logger.info(`Saving to folder '${folderPath}'`);
 
-        // todo: if file already exists, either merge or ask user if they want to overwrite, maybe check at satrtup
+        fsSync.mkdirSync(folderPath, {recursive: true});
         fsSync.writeFileSync(paths.data, JSON.stringify(data));
         fsSync.writeFileSync(paths.nameIdData, JSON.stringify(nameData));
         fsSync.writeFileSync(
             paths.excludedCoordinates,
             JSON.stringify(Array.from(excludedCoordinates))
         );
+        logger.info('Data saved successfully.');
     } catch (error) {
         logger.error(`Error saving to folder, ${(error as Error).message}`);
     }
@@ -40,7 +67,7 @@ export const loadSaveFolder = async (
     const paths = getFilePaths(folderPath);
 
     try {
-        logger.info(`Loading data from: ${folderPath}`);
+        logger.info(`Loading data from folder '${folderPath}'`);
 
         const [dataContent, nameIdDataContent, excludedCoordinatesContent] =
             await Promise.all([
@@ -49,13 +76,15 @@ export const loadSaveFolder = async (
                 fs.readFile(paths.excludedCoordinates, 'utf-8')
             ]);
 
+        logger.info(`Successfully loaded data.`);
+
         return {
             data: JSON.parse(dataContent),
             nameData: JSON.parse(nameIdDataContent),
-            excludedCoordinates: JSON.parse(excludedCoordinatesContent)
+            excludedCoordinates: new Set(JSON.parse(excludedCoordinatesContent))
         };
     } catch (error) {
-        logger.error(`Error loading save folder, ${(error as Error).message}`);
+        logger.error(`Error loading data from folder, ${(error as Error).message}.`);
         return null;
     }
 };
@@ -97,7 +126,7 @@ export const shouldScrapeCoordinate = (coordinates: Coordinates, data: Data): bo
 }
 
 export const handleExit = (context: Context, reason: string) => {
-    logger.warn(`${reason}, saving state and exiting...`);
+    logger.warn(`${reason}. Saving state and exiting...`);
 
     saveToFolderSync(process.env.OUTPUT_PATH, context as Data);
     process.exit(0)

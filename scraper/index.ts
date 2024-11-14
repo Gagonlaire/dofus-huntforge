@@ -11,7 +11,7 @@ import {
 } from "./src/utils/common";
 import {connect} from "./src/core";
 import {GhostCursor} from "ghost-cursor";
-import {footer, header, printFooter} from "./src/utils/data";
+import {header} from "./src/utils/data";
 
 const updateInputValue = async (element: ElementHandle, value: string, cursor?: GhostCursor) => {
     if (cursor) {
@@ -41,6 +41,7 @@ const getHintsForPosition = async (
     if (!instance.lastCoordinates || instance.lastCoordinates.y !== y) {
         await updateInputValue(instance.elements.y, y.toString(), instance.cursor)
     }
+    instance.lastCoordinates = {x, y}
 
     await randomSleep()
 
@@ -53,8 +54,6 @@ const getHintsForPosition = async (
             await clickDirection(instance, i as Direction)
         }
     }
-
-    instance.lastCoordinates = {x, y}
 }
 
 (async () => {
@@ -76,14 +75,16 @@ const getHintsForPosition = async (
     if (config.manual) {
         logger.warn('Manual mode enabled. Go to the opened browser and start scraping.')
     } else {
-        logger.warn('Scraper in automatic mode, building positions to scrape.')
         ctx.queue = createQueue(ctx)
 
         while (ctx.queue.length !== 0) {
-            await sleep(1000)
+            const items = ctx.queue.splice(0, config.instanceCount)
+
+            await Promise.all(items.map(([coordinates, direction], idx) => {
+                return getHintsForPosition(ctx, ctx.pages[idx], coordinates, direction)
+            }))
         }
 
-        // guard to wait for all requests to finish
         while (ctx.onGoingRequests > 0) {
             await sleep(250)
         }

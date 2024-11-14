@@ -46,6 +46,8 @@ export interface PageInstance {
     elements: DomElements;
 }
 
+export type QueueItem = [Coordinates, Direction?];
+
 export interface Data {
     data: any;
     nameData: any;
@@ -59,6 +61,6 @@ export interface Context extends Data {
     // avoid quitting before all requests are done
     onGoingRequests: number;
     // store requests to dispatch
-    queue: any[];
+    queue: QueueItem[];
     hasNewData: boolean;
 }

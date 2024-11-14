@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
-import {type Config, Context, type Coordinates, type Data, Direction} from "../../types";
+import {type Config, Context, type Coordinates, type Data, Direction, QueueItem} from "../../types";
 import logger from "./logger";
 import {defaultSavePath, mapCoordinatesBounds, printFooter, saveFiles} from "./data";
 import chalk from "chalk";
@@ -124,13 +124,13 @@ export const buildKeyFromCoordinates = (coordinates: Coordinates): string => {
     return `${coordinates.x},${coordinates.y}`;
 }
 
-export const createQueue = (data: Data): any[] => {
-    let queue: any[] = [];
+export const createQueue = (data: Data): QueueItem[] => {
+    const queue: QueueItem[] = [];
     let skipCount = 0;
     let skipStart: Coordinates;
     let skipEnd: Coordinates;
 
-    logger.info('Creating queue...');
+    logger.warn('Scraper in automatic mode, building positions to scrape.')
     for (let y = mapCoordinatesBounds.minY; y <= mapCoordinatesBounds.maxY; y++) {
         for (let x = mapCoordinatesBounds.minX; x <= mapCoordinatesBounds.maxX; x++) {
             const coordinates = {x, y};
@@ -142,7 +142,7 @@ export const createQueue = (data: Data): any[] => {
                     skipCount = 0;
                 }
 
-                queue.push(coordinates);
+                queue.push([coordinates]);
             } else {
                 if (skipCount === 0) {
                     skipStart = coordinates;

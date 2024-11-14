@@ -1,6 +1,6 @@
 import {HTTPResponse, Page} from "puppeteer";
 import {Config, Context, Direction, DomElements, PageInstance} from "../types";
-import {pageLoggingColors, printFooter, selectors, userAgents} from "./utils/data";
+import {pageLoggingColors, selectors, userAgents} from "./utils/data";
 import logger, {createColorizedLogger} from "./utils/logger";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
@@ -14,7 +14,7 @@ const handleNetworkResponse = async (ctx: Context, page: PageInstance, response:
 
     if (response.status() === 503) {
         page.logger.warn(`Request blocked by reCAPTCHA for ${formatCoordinates(coordinates)} -> ${chalk.bold(Direction[direction])}`)
-        // should add back to te queue
+        ctx.queue.push([coordinates, direction])
         return
     }
 

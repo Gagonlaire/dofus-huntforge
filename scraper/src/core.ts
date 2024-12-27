@@ -64,7 +64,7 @@ const handleNetworkResponse = async (context: Context, page: PageInstance, respo
         });
 
         delete context.buffer[key]
-        page.logger.info(`Fetched ${formatCoordinates(coordinates)}, ${chalk.bold(counts[0])} maps, ${chalk.bold(counts[1])} hints`)
+        page.logger.info(`Fetched ${page.loggerColor(formatCoordinates(coordinates))} -> ${page.loggerColor.bold(`${counts[0]} maps`)}, ${page.loggerColor.bold(`${counts[1]} hints`)}`)
 
         if (counts[0] === 0) {
             delete data[key]
@@ -110,14 +110,15 @@ export const connect = async (config: Config): Promise<Context> => {
             args: config.args
         })
 
-    logger.info(`Connecting pages to ${chalk.bold.blue('https://dofusdb.fr/fr/tools/treasure-hunt')}.`)
+    logger.info(`Connecting pages to ${chalk.bold.blue('https://dofusdb.fr/fr/tools/treasure-hunt')}`)
     const pages: PageInstance[] = await Promise.all([...Array(config.instanceCount)].map(async (_, idx) => {
         const page = await browser.newPage()
-        const pageLogger = createColorizedLogger(pageLoggingColors[idx % pageLoggingColors.length], `page ${idx + 1}`)
+        const loggerColor = pageLoggingColors[idx % pageLoggingColors.length]
+        const pageLogger = createColorizedLogger(loggerColor, `page ${idx + 1}`)
         const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)]
 
         await page.setUserAgent(userAgent)
-        pageLogger.info(`Connecting and configuring page with user-agent: ${pageLoggingColors[idx].bold(userAgent)}`)
+        pageLogger.info(`Connecting and configuring page with user-agent: ${loggerColor.bold(userAgent)}`)
         await page.goto('https://dofusdb.fr/fr/tools/treasure-hunt')
         // disable all modals to fasten the scraping process
         await page.evaluate(() => {
@@ -138,11 +139,13 @@ export const connect = async (config: Config): Promise<Context> => {
             page: page,
             cursor,
             elements,
+            loggerColor,
             logger: pageLogger,
             active: true,
             paused: false,
         }
     }))
+
     const browserContext: Context = {
         browser,
         pages,
@@ -155,7 +158,7 @@ export const connect = async (config: Config): Promise<Context> => {
         hasNewData: false
     }
 
-    logger.info('Setting up event listeners for all pages.');
+    logger.info('Setting up event listeners for all pages');
 
     pages.forEach((page) => {
         page.page.on('response', async (response) => {
@@ -169,7 +172,7 @@ export const connect = async (config: Config): Promise<Context> => {
         })
 
         page.page.on('close', async () => {
-            page.logger.warn('Page closed, instance is now disabled.')
+            page.logger.warn('Page closed, instance is now disabled')
             page.active = false
 
             if (pages.every(p => !p.active)) {

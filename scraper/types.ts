@@ -1,6 +1,7 @@
 import type {ElementHandle, Page, Browser} from 'puppeteer'
 import type {GhostCursor} from "ghost-cursor";
 import {Logger} from "winston";
+import {ChalkInstance} from "chalk";
 
 export type MapBounds = {
     minX: number,
@@ -46,6 +47,7 @@ export interface PageInstance {
     page: Page;
     cursor: GhostCursor;
     logger: Logger;
+    loggerColor: ChalkInstance;
     // instance can pause itself after too many reCAPTCHA
     paused: boolean;
     // to know if input need to be updated

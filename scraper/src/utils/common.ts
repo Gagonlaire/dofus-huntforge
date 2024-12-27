@@ -38,39 +38,39 @@ export const parseConfigFromEnv = (): Config => {
     // validate mapBounds if some are provided
     if (process.env.MAP_BOUNDS) {
         if (config.mapBounds.minX >= config.mapBounds.maxX || config.mapBounds.minY >= config.mapBounds.maxY) {
-            logger.error('Invalid map bounds, min values must be lower than max values.')
+            logger.error('Invalid map bounds, min values must be lower than max values')
             process.exit(1)
         }
         if (Object.values(config.mapBounds).some(isNaN)) {
-            logger.error('Invalid map bounds, all values must be numbers.')
+            logger.error('Invalid map bounds, all values must be numbers')
             process.exit(1)
         }
         if (config.mapBounds.minX < defaultMapBounds.minX ||
             config.mapBounds.minY < defaultMapBounds.minY ||
             config.mapBounds.maxX > defaultMapBounds.maxX ||
             config.mapBounds.maxY > defaultMapBounds.maxY) {
-            logger.warn('Map bounds are outside the default bounds, this might cause issues.')
+            logger.warn('Map bounds are outside the default bounds, this might cause issues')
         }
     }
 
     // warn about recommended args not present, especially in CI/CD environments
     if (!config.args.includes('--no-sandbox') || !config.args.includes('--disable-setuid-sandbox')) {
-        logger.warn('You are using custom args, but missing --no-sandbox or --disable-setuid-sandbox. This might cause issues.')
+        logger.warn('You are using custom args, but missing --no-sandbox or --disable-setuid-sandbox. This might cause issues')
     }
 
     // if manual mode is enabled, we set the instance count to 1
     if (config.manual && config.instanceCount !== 1) {
-        logger.warn('Manual mode enabled, setting instance count to 1.')
+        logger.warn('Manual mode enabled, setting instance count to 1')
         config.instanceCount = 1
     }
 
     // if target dir exists and input dir !== target dir, data might be unintentionally overwritten so we ask for the overwrite flag
     if (fsSync.existsSync(config.saveOutputPath) && config.saveInputPath !== config.saveOutputPath && !config.overwriteSave) {
-        logger.error(`Output path ${config.saveOutputPath} would be overwritten, set OVERWRITE=true or change the SAVE_OUTPUT_PATH.`)
+        logger.error(`Output path ${config.saveOutputPath} would be overwritten, set OVERWRITE=true or change the SAVE_OUTPUT_PATH`)
         process.exit(1)
     }
 
-    logger.info('Configuration loaded successfully.', config);
+    logger.info('Configuration loaded successfully:', config);
 
     return config
 }
@@ -82,7 +82,7 @@ export const saveToFolderSync = (
     const paths = getFilePaths(folderPath);
 
     try {
-        logger.info(`Saving to folder '${folderPath}'.`);
+        logger.info(`Saving to folder '${folderPath}'`);
 
         fsSync.mkdirSync(folderPath, {recursive: true});
         fsSync.writeFileSync(paths.data, JSON.stringify(data));
@@ -91,9 +91,9 @@ export const saveToFolderSync = (
             paths.excludedCoordinates,
             JSON.stringify(Array.from(excludedCoordinates))
         );
-        logger.info('Data saved successfully.');
+        logger.info('Data saved successfully');
     } catch (error) {
-        logger.error(`Error saving to folder, ${(error as Error).message}.`);
+        logger.error(`Error saving to folder, ${(error as Error).message}`);
     }
 };
 
@@ -103,7 +103,7 @@ export const loadSaveFolder = async (
     const paths = getFilePaths(folderPath);
 
     try {
-        logger.info(`Loading data from folder '${folderPath}'.`);
+        logger.info(`Loading data from folder '${folderPath}'`);
 
         const [dataContent, nameIdDataContent, excludedCoordinatesContent] =
             await Promise.all([
@@ -112,7 +112,7 @@ export const loadSaveFolder = async (
                 fs.readFile(paths.excludedCoordinates, 'utf-8')
             ]);
 
-        logger.info(`Successfully loaded data.`);
+        logger.info(`Successfully loaded data`);
 
         return {
             data: JSON.parse(dataContent),
@@ -120,7 +120,7 @@ export const loadSaveFolder = async (
             excludedCoordinates: new Set(JSON.parse(excludedCoordinatesContent))
         };
     } catch (error) {
-        logger.error(`Error loading data from folder, ${(error as Error).message}.`);
+        logger.error(`Error loading data from folder, ${(error as Error).message}`);
         return null;
     }
 };
@@ -161,7 +161,7 @@ export const createQueue = (context: Context, config: Config): QueueItem[] => {
     let skipStart: Coordinates;
     let skipEnd: Coordinates;
 
-    logger.warn('Scraper in automatic mode, building positions to scrape.')
+    logger.warn('Scraper in automatic mode, building positions to scrape')
     for (let y = config.mapBounds.minY; y <= config.mapBounds.maxY; y++) {
         for (let x = config.mapBounds.minX; x <= config.mapBounds.maxX; x++) {
             const coordinates = {x, y};
@@ -183,7 +183,7 @@ export const createQueue = (context: Context, config: Config): QueueItem[] => {
             }
         }
     }
-    logger.info(`Queue created successfully. ${queue.length} coordinates to scrape.`);
+    logger.info(`Queue created successfully. ${queue.length} coordinates to scrape`);
 
     return queue;
 };

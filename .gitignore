@@ -1,5 +1,9 @@
+# IDE config folder
 .idea
+.vscode
+
 data
+
 .DS_Store
 node_modules
 /build

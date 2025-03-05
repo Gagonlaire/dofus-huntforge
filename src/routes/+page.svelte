@@ -1,13 +1,12 @@
-<script>
-    import { Input } from "$lib/components/ui/input";
+<script lang="ts">
+    import Grid, { GridItem } from 'svelte-grid-extended';
 
-    let x = $state(0);
-    let y = $state(0);
+    const itemSize = { height: 40 };
 </script>
 
-<section class="w-screen h-screen flex flex-col justify-center items-center">
-    <div class="flex items-center gap-6">
-        <Input bind:value={x} type="number" />
-        <Input bind:value={y} type="number" />
-    </div>
-</section>
+
+
+<Grid {itemSize} cols={10} rows={0} collision="push">
+    <GridItem x={1} y={0} class="item">Hey</GridItem>
+    <GridItem x={3} y={3} w={4} class="item">Hoy</GridItem>
+</Grid>

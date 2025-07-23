@@ -1,12 +1,7 @@
 <script lang="ts">
-    import Grid, { GridItem } from 'svelte-grid-extended';
-
-    const itemSize = { height: 40 };
+    import {Button} from "@/components/ui/button";
 </script>
 
-
-
-<Grid {itemSize} cols={10} rows={0} collision="push">
-    <GridItem x={1} y={0} class="item">Hey</GridItem>
-    <GridItem x={3} y={3} w={4} class="item">Hoy</GridItem>
-</Grid>
+<h1>Welcome to SvelteKit</h1>
+<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<Button>Click me</Button>

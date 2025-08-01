@@ -1,7 +1,12 @@
 <script lang="ts">
-    import {Button} from "@/components/ui/button";
+	import DirectionSelector from '@/components/DirectionSelector.svelte';
+	import PositionSelector from '@/components/PositionSelector.svelte';
+	import { createHuntContext } from '@/context/HuntContext.svelte';
+	import HintSelector from '@/components/HintSelector.svelte';
+
+	const huntCtx = createHuntContext();
 </script>
 
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
-<Button>Click me</Button>
+<PositionSelector bind:position={huntCtx.position} />
+<DirectionSelector bind:direction={huntCtx.direction} />
+<HintSelector onSelect={(id) => huntCtx.moveTo(id)} values={huntCtx.hints} />

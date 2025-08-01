@@ -1,6 +1,15 @@
 use phf;
+use serde::Serialize;
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Serialize)]
+pub struct Hint {
+    pub names: &'static HintName,
+    pub dist: u32,
+    pub x: i32,
+    pub y: i32,
+}
+
+#[derive(Clone, Serialize)]
 pub struct HintName {
     pub de: &'static str,
     pub en: &'static str,
@@ -10,7 +19,7 @@ pub struct HintName {
     pub pt: &'static str,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HintStep {
     pub dist: u32,
     pub x: i32,
@@ -32,6 +41,8 @@ pub fn get_hints_map() -> &'static phf::Map<&'static str, [Option<&'static [Hint
     &HINTS
 }
 
-pub fn get_hints(coords: &str) -> Option<&'static [Option<&'static [HintStep]>; 4]> {
-    HINTS.get(coords)
+pub fn get_hints(x: i32, y: i32) -> Option<&'static [Option<&'static [HintStep]>; 4]> {
+    let coords = format!("{},{}", x, y);
+
+    HINTS.get(coords.as_str())
 }
